@@ -1,0 +1,17 @@
+// Hack memory map: RAM16K (0..16383), Screen (16384..24575), Keyboard (24576).
+CHIP Memory {
+    IN in[16], load, address[15];
+    OUT out[16];
+
+    PARTS:
+    DMux(in=load, sel=address[14], a=loadRAM, b=loadUpper);
+    DMux(in=loadUpper, sel=address[13], a=loadScreen, b=loadKeyboard);
+    RAM16K(in=in, load=loadRAM, address=address[0..13], out=ramOut);
+    Screen(in=in, load=loadScreen, address=address[0..12], out=screenOut);
+    Keyboard(out=keyboardOut);
+
+    Mux16(a=ramOut, b=screenOut, sel=address[14], out=ramOrScreen);
+    // When address[14]=1 and address[13]=1, select keyboard.
+    And(a=address[14], b=address[13], out=selectKeyboard);
+    Mux16(a=ramOrScreen, b=keyboardOut, sel=selectKeyboard, out=out);
+}

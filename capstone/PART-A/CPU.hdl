@@ -1,0 +1,46 @@
+// Hack CPU. Uses the standard built-in ARegister, DRegister, ALU and PC chips.
+CHIP CPU {
+    IN  inM[16], instruction[16], reset;
+    OUT outM[16], writeM, addressM[15], pc[15];
+
+    PARTS:
+    // Instruction decoding
+    Not(in=instruction[15], out=isA);
+    And(a=instruction[15], b=true, out=isC);
+
+    // A-instruction or C-instruction destination selection
+    Mux16(a=instruction, b=outM, sel=instruction[15], out=aIn);
+    ARegister(in=aIn, load=loadA, out=aOut, out[0..14]=addressM);
+
+    // A destination is selected for every A-instruction, or when dest A is set.
+    Or(a=isA, b=destA, out=loadA);
+
+    // D register
+    DRegister(in=outM, load=loadD, out=dOut);
+
+    // ALU input: A register or memory, selected by a-bit
+    Mux16(a=aOut, b=inM, sel=instruction[12], out=yIn);
+    ALU(x=dOut, y=yIn,
+        zx=instruction[11], nx=instruction[10],
+        zy=instruction[9],  ny=instruction[8],
+        f=instruction[7],   no=instruction[6],
+        out=outM, zr=zr, ng=ng);
+
+    // Destination bits
+    And(a=isC, b=instruction[5], out=destA);
+    And(a=isC, b=instruction[4], out=loadD);
+    And(a=isC, b=instruction[3], out=writeM);
+
+    // Jump logic: j1=JGT, j2=JEQ, j3=JLT
+    Not(in=ng, out=notNg);
+    Not(in=zr, out=notZr);
+    And(a=notNg, b=notZr, out=positive);
+    And(a=instruction[0], b=ng, out=jumpLT);
+    And(a=instruction[1], b=zr, out=jumpEQ);
+    And(a=instruction[2], b=positive, out=jumpGT);
+    Or(a=jumpLT, b=jumpEQ, out=jumpLE);
+    Or(a=jumpLE, b=jumpGT, out=jump);
+    And(a=isC, b=jump, out=loadPC);
+
+    PC(in=aOut, load=loadPC, inc=true, reset=reset, out[0..14]=pc);
+}
